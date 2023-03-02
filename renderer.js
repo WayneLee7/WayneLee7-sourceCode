@@ -46,6 +46,99 @@ const mount = (vnode, container) => {
             mount(item, el)
         })
     }
-
     container.appendChild(el)
+}
+
+patch = (n1, n2) => {
+    // 判断两个虚拟节点是不是同一个元素类型
+    if (n1.tag !== n2.tag) {
+        // 获取旧节点的父元素
+        const n1ElParent = n1.el.parentElement
+        // 使用父元素删除旧节点
+        n1ElParent.removeChild(n1.el)
+        // 使用mount函数 生成dom节点 并挂载到父元素上
+        mount(n2, n1ElParent)
+    } else {
+        // 不是同一类型继续判断
+        // 旧节点el在n2中进行保存
+        const el = n2.el = n1.el
+        // 处理props
+        const oldProps = n1.props || {}
+        const newProps = n2.props || {}
+
+        for (const key in newProps) {
+            /**
+             * 遍历新节点 判断新的节点里面是否存在和旧节点一样的属性
+             * 旧： classw: 'why',     id: "box1", name: "bbb"
+             * 新： classw: 'codewhy', id: "box1"
+             * 
+             * key [classw,id]
+             * why,box1,
+             * codewhy,box1
+             * 
+             *  如果相同key的value不一样 先判断是不是事件 然后设置元素为新的属性
+             */
+
+            const oldValue = oldProps[key]
+            const newValue = newProps[key]
+            if (newValue !== oldValue) {
+                if (key.startsWith("on")) {
+                    el.addEventListener(key.slice(2).toLowerCase(), newValue)
+                } else {
+                    el.setAttribute(key, newValue)
+                }
+            }
+        }
+
+        // 删除旧的多余的prop
+        for (const key in oldProps) {
+            // 遍历旧的props
+            // 如果旧的key在新的不存在的话
+            if (!(key in newProps)) {
+                // 判断是否为事件
+                if (key.startsWith("on")) {
+                    const value = oldProps[key]
+                    el.removeEventListener(key.slice(2).toLowerCase(), value)
+                } else {
+                    // 删除多余的属性
+                    el.removeAttribute(key)
+                }
+            }
+        }
+
+        // 处理children
+        const oldChildren = n1.children || []
+        const newChildren = n2.children || []
+        if (typeof newChildren === 'string') {
+            // 边界判断
+            el.innerHTML = newChildren
+        } else {
+            // new是数组，
+            if (typeof oldChildren == 'string') {
+                el.innerHTML = ''
+                newChildren.forEach(item => {
+                    mount(item, el)
+                })
+            } else {
+                // 都是数组
+                const commonLength = Math.min(oldChildren.length, newChildren.length)
+                for (let i = 0; i < commonLength; i++) {
+                    patch(oldChildren[i], newChildren[i])
+                }
+
+                // [v1, v2, v3, v2, v2]
+                // [v1, v5, v9, v7]
+                if (newChildren.length > oldChildren.length) {
+                    newChildren.slice(oldChildren.length).forEach(item => {
+                        mount(item, el)
+                    })
+                }
+                if (newChildren.length < oldChildren.length) {
+                    oldChildren(newChildren.length).forEach(item => {
+                        el.removeChild(item.el)
+                    })
+                }
+            }
+        }
+    }
 }
